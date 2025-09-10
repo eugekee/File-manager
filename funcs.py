@@ -1,92 +1,129 @@
 import os
-import shutil
 import re
+import shutil
 from datetime import datetime
-from typing import List, Tuple
 
 
-def create_folder(path: str) -> str:
-    os.makedirs(path, exist_ok=True)
-    return f"Папка создана: {path}"
-
-
-def delete_path(path: str) -> str:
-    if os.path.isdir(path):
-        shutil.rmtree(path)
-        return f"Папка удалена: {path}"
-    elif os.path.isfile(path):
-        os.remove(path)
-        return f"Файл удалён: {path}"
-    else:
-        raise FileNotFoundError(f"Не найден файл/папка: {path}")
-
-
-def find_files_by_regex(folder: str, pattern: str) -> List[str]:
-    matches = []
+def create_folder(path):
     try:
-        prog = re.compile(pattern)
-        for root, _, files in os.walk(folder):
-            for f in files:
-                if prog.search(f):
-                    matches.append(os.path.join(root, f))
-    except re.error:
-        raise ValueError("Неверное регулярное выражение")
-    return matches
+        os.makedirs(path, exist_ok=True)
+        return f"Папка создана: {path}"
+    except Exception as e:
+        raise Exception(f"Ошибка при создании папки: {str(e)}")
 
 
-def add_date_to_filenames(path: str, recursive: bool = False) -> List[str]:
-    def add_date(file_path: str) -> str:
-        ctime = os.path.getctime(file_path)
-        date_str = datetime.fromtimestamp(ctime).strftime("%Y%m%d")
-        dirname, filename = os.path.split(file_path)
-        new_filename = f"{date_str}_{filename}"
-        new_path = os.path.join(dirname, new_filename)
-        os.rename(file_path, new_path)
-        return new_path
+def delete_path(path):
+    try:
+        if not os.path.exists(path):
+            return "Указанный путь не существует"
 
-    results = []
-    if os.path.isfile(path):
-        results.append(add_date(path))
-    elif os.path.isdir(path):
-        if recursive:
-            for root, _, files in os.walk(path):
-                for f in files:
-                    results.append(add_date(os.path.join(root, f)))
+        if os.path.isfile(path):
+            os.remove(path)
+            return f"Файл удален: {path}"
         else:
-            for f in os.listdir(path):
-                full = os.path.join(path, f)
-                if os.path.isfile(full):
-                    results.append(add_date(full))
-    else:
-        raise FileNotFoundError(f"Не найден файл/папка: {path}")
-    return results
+            shutil.rmtree(path)
+            return f"Папка удалена: {path}"
+    except Exception as e:
+        raise Exception(f"Ошибка при удалении: {str(e)}")
 
 
-def get_info(path: str) -> str:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Объект не найден: {path}")
+def find_files_by_regex(path, pattern, recursive=False):
+    try:
+        regex = re.compile(pattern)
+        found_items = []
 
-    info = []
-    if os.path.isfile(path):
-        info.append(f"Файл: {path}")
-        info.append(f"Размер: {os.path.getsize(path)} байт")
-    else:
-        info.append(f"Папка: {path}")
-        count = sum(len(files) for _, _, files in os.walk(path))
-        info.append(f"Количество файлов: {count}")
+        if recursive:
+            for root, dirs, files in os.walk(path):
+                for name in dirs + files:
+                    if regex.search(name):
+                        full_path = os.path.join(root, name)
+                        found_items.append(full_path)
+        else:
+            for item in os.listdir(path):
+                if regex.search(item):
+                    full_path = os.path.join(path, item)
+                    found_items.append(full_path)
 
-    info.append(f"Создан: {datetime.fromtimestamp(os.path.getctime(path))}")
-    info.append(f"Изменён: {datetime.fromtimestamp(os.path.getmtime(path))}")
-    return "\n".join(info)
+        return found_items
+    except re.error as e:
+        raise Exception(f"Ошибка в регулярном выражении: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Ошибка при поиске: {str(e)}")
 
 
-def sort_contents(path: str, reverse: bool = False) -> List[Tuple[str, bool]]:
-    if not os.path.isdir(path):
-        raise NotADirectoryError(f"Не является папкой: {path}")
+def add_date_to_filenames(path, recursive=False):
+    try:
+        processed_files = []
 
-    items = []
-    for item in os.listdir(path):
-        full_path = os.path.join(path, item)
-        items.append((item, os.path.isdir(full_path)))
+        if recursive:
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    dir_name = os.path.dirname(file_path)
+                    file_name, file_ext = os.path.splitext(file)
+                    new_name = f"{file_name}_{datetime.now().strftime('%d_%m_%Y')}{file_ext}"
+                    new_path = os.path.join(dir_name, new_name)
+                    os.rename(file_path, new_path)
+                    processed_files.append(new_path)
+        else:
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                if os.path.isfile(item_path):
+                    dir_name = os.path.dirname(item_path)
+                    file_name, file_ext = os.path.splitext(item)
+                    new_name = f"{file_name}_{datetime.now().strftime('%d_%m_%Y')}{file_ext}"
+                    new_path = os.path.join(dir_name, new_name)
+                    os.rename(item_path, new_path)
+                    processed_files.append(new_path)
 
-    return sorted(items, key=lambda x: x[0], reverse=reverse)
+        return processed_files
+    except Exception as e:
+        raise Exception(f"Ошибка при добавлении даты: {str(e)}")
+
+
+def get_info(path):
+    try:
+        if not os.path.exists(path):
+            return "Путь не существует"
+
+        if os.path.isfile(path):
+            size = os.path.getsize(path)
+            mtime = datetime.fromtimestamp(os.path.getmtime(path))
+            return f"Файл: {path}\nРазмер: {size} байт\nПоследнее изменение: {mtime.strftime('%d-%m-%Y')}"
+        elif os.path.isdir(path):
+            num_files = 0
+            num_dirs = 0
+            total_size = 0
+
+            for root, dirs, files in os.walk(path):
+                num_dirs += len(dirs)
+                num_files += len(files)
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if os.path.isfile(file_path):
+                        total_size += os.path.getsize(file_path)
+
+            mtime = datetime.fromtimestamp(os.path.getmtime(path))
+            return f"Папка: {path}\nРазмер: {total_size} байт\nПодпапок: {num_dirs}\nФайлов: {num_files}\nПоследнее изменение: {mtime.strftime('%d-%m-%Y')}"
+        else:
+            return "Неизвестный тип объекта"
+    except Exception as e:
+        raise Exception(f"Ошибка при получении информации: {str(e)}")
+
+
+def sort_contents(path, reverse=False):
+    try:
+        if not os.path.exists(path):
+            raise Exception("Путь не существует")
+        if not os.path.isdir(path):
+            raise Exception("Указанный путь не является папкой")
+
+        items = []
+        for name in os.listdir(path):
+            full_path = os.path.join(path, name)
+            is_dir = os.path.isdir(full_path)
+            items.append((name, is_dir))
+        items.sort(key=lambda x: (not x[1], x[0].lower()), reverse=reverse)
+        return items
+    except Exception as e:
+        raise Exception(f"Ошибка при сортировке: {str(e)}")
